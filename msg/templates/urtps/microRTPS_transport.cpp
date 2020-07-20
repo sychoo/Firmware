@@ -154,8 +154,7 @@ ssize_t Transport_node::read(uint8_t *topic_ID, char out_buffer[], size_t buffer
 
 		// The message won't fit the buffer.
 		if (buffer_len < header_size + payload_len) {
-			// drop the message and continue the readings
-			// @note: this is just a work around to avoid the link to be closed
+			// Drop the message and continue with the read buffer
 			memmove(rx_buffer, rx_buffer + msg_start_pos + 1, rx_buff_pos - (msg_start_pos + 1));
 			rx_buff_pos = rx_buff_pos - (msg_start_pos + 1);
 			return -EMSGSIZE;
@@ -186,6 +185,12 @@ ssize_t Transport_node::read(uint8_t *topic_ID, char out_buffer[], size_t buffer
 #else
 			if (debug) PX4_DEBUG("Bad CRC %u != %u\t\t(↓ %lu)", read_crc, calc_crc, (unsigned long)(header_size + payload_len));
 #endif /* PX4_DEBUG */
+
+			// If there is a CRC error, the payload len cannot be trusted
+			rx_buff_pos -= (msg_start_pos + 1);
+
+			// Drop garbage up just beyond the start of the message
+			memmove(rx_buffer, rx_buffer + (msg_start_pos + 1 ), rx_buff_pos );
 			len = -1;
 
 		} else {
@@ -196,7 +201,7 @@ ssize_t Transport_node::read(uint8_t *topic_ID, char out_buffer[], size_t buffer
 		}
 
 		// discard message from rx_buffer
-		rx_buff_pos -= header_size + payload_len;
+		rx_buff_pos -= msg_start_pos + header_size + payload_len;
 		memmove(rx_buffer, rx_buffer + msg_start_pos + header_size + payload_len, rx_buff_pos);
 
 		return len;
@@ -452,61 +457,78 @@ bool UART_node::baudrate_to_speed(uint32_t bauds, speed_t *speed)
 #define B1000000 1000000
 #endif
 
-	switch (bauds) {
-	case 0:      *speed = B0;      break;
-
-	case 50:     *speed = B50;     break;
-
-	case 75:     *speed = B75;     break;
-
-	case 110:    *speed = B110;    break;
-
-	case 134:    *speed = B134;    break;
-
-	case 150:    *speed = B150;    break;
-
-	case 200:    *speed = B200;    break;
-
-	case 300:    *speed = B300;    break;
-
-	case 600:    *speed = B600;    break;
-
-	case 1200:   *speed = B1200;   break;
-
-	case 1800:   *speed = B1800;   break;
-
-	case 2400:   *speed = B2400;   break;
-
-	case 4800:   *speed = B4800;   break;
-
-	case 9600:   *speed = B9600;   break;
-
-	case 19200:  *speed = B19200;  break;
-
-	case 38400:  *speed = B38400;  break;
-
-	case 57600:  *speed = B57600;  break;
-
-	case 115200: *speed = B115200; break;
-
-	case 230400: *speed = B230400; break;
-
-	case 460800: *speed = B460800; break;
-
-	case 500000: *speed = B500000; break;
-
-	case 921600: *speed = B921600; break;
-
-	case 1000000: *speed = B1000000; break;
-
-#ifdef B1500000
-
-	case 1500000: *speed = B1500000; break;
+#ifndef B1500000
+#define B1500000 1500000
 #endif
+
+#ifndef B2000000
+#define B2000000 2000000
+#endif
+
+	switch (bauds) {
+	case 0:      *speed = B0;		break;
+
+	case 50:     *speed = B50;		break;
+
+	case 75:     *speed = B75;		break;
+
+	case 110:    *speed = B110;		break;
+
+	case 134:    *speed = B134;		break;
+
+	case 150:    *speed = B150;		break;
+
+	case 200:    *speed = B200;		break;
+
+	case 300:    *speed = B300;		break;
+
+	case 600:    *speed = B600;		break;
+
+	case 1200:   *speed = B1200;		break;
+
+	case 1800:   *speed = B1800;		break;
+
+	case 2400:   *speed = B2400;		break;
+
+	case 4800:   *speed = B4800;		break;
+
+	case 9600:   *speed = B9600;		break;
+
+	case 19200:  *speed = B19200;		break;
+
+	case 38400:  *speed = B38400;		break;
+
+	case 57600:  *speed = B57600;		break;
+
+	case 115200: *speed = B115200;		break;
+
+	case 230400: *speed = B230400;		break;
+
+	case 460800: *speed = B460800;		break;
+
+	case 500000: *speed = B500000;		break;
+
+	case 921600: *speed = B921600;		break;
+
+	case 1000000: *speed = B1000000;	break;
+
+	case 1500000: *speed = B1500000;	break;
+
+	case 2000000: *speed = B2000000;	break;
 
 #ifdef B3000000
 
-	case 3000000: *speed = B3000000; break;
+	case 3000000: *speed = B3000000;    break;
+#endif
+
+#ifdef B3500000
+
+	case 3500000: *speed = B3500000;    break;
+#endif
+
+#ifdef B4000000
+
+	case 4000000: *speed = B4000000;    break;
 #endif
 
 	default:
