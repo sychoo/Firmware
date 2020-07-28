@@ -43,7 +43,7 @@
 #endif
 #include <termios.h>
 
-#define BUFFER_SIZE 2048
+#define BUFFER_SIZE 1024
 #define DEFAULT_UART "/dev/ttyACM0"
 
 class Transport_node
