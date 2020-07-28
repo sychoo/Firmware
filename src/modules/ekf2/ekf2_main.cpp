@@ -61,6 +61,7 @@
 #include <uORB/topics/ekf_gps_position.h>
 #include <uORB/topics/estimator_innovations.h>
 #include <uORB/topics/estimator_sensor_bias.h>
+#include <uORB/topics/estimator_states.h>
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/landing_target_pose.h>
 #include <uORB/topics/optical_flow.h>
@@ -274,6 +275,7 @@ private:
 	uORB::Publication<estimator_innovations_s>		_estimator_innovation_variances_pub{ORB_ID(estimator_innovation_variances)};
 	uORB::Publication<estimator_innovations_s>		_estimator_innovations_pub{ORB_ID(estimator_innovations)};
 	uORB::Publication<estimator_sensor_bias_s>		_estimator_sensor_bias_pub{ORB_ID(estimator_sensor_bias)};
+	uORB::Publication<estimator_states_s>			_estimator_states_pub{ORB_ID(estimator_states)};
 	uORB::Publication<estimator_status_s>			_estimator_status_pub{ORB_ID(estimator_status)};
 	uORB::Publication<vehicle_attitude_s>			_att_pub{ORB_ID(vehicle_attitude)};
 	uORB::Publication<vehicle_odometry_s>			_vehicle_odometry_pub{ORB_ID(vehicle_odometry)};
@@ -1521,14 +1523,20 @@ void Ekf2::Run()
 				_estimator_sensor_bias_pub.publish(bias);
 			}
 
+			// publish estimator states
+			estimator_states_s states;
+			states.timestamp = now;
+			_ekf.getStateAtFusionHorizonAsVector().copyTo(states.states);
+			states.n_states = 24;
+			_ekf.covariances_diagonal().copyTo(states.covariances);
+			_estimator_states_pub.publish(states);
+
 			// publish estimator status
 			estimator_status_s status;
 			status.timestamp = now;
-			_ekf.getStateAtFusionHorizonAsVector().copyTo(status.states);
-			status.n_states = 24;
-			_ekf.covariances_diagonal().copyTo(status.covariances);
-			_ekf.getOutputTrackingError().copyTo(status.output_tracking_error);
 			_ekf.get_gps_check_status(&status.gps_check_fail_flags);
+			_ekf.getImuVibrationMetrics().copyTo(status.vibe);
+			_ekf.getOutputTrackingError().copyTo(status.output_tracking_error);
 			// only report enabled GPS check failures (the param indexes are shifted by 1 bit, because they don't include
 			// the GPS Fix bit, which is always checked)
 			status.gps_check_fail_flags &= ((uint16_t)_params->gps_check_mask << 1) | 1;
@@ -1542,7 +1550,7 @@ void Ekf2::Run()
 			status.pos_horiz_accuracy = _vehicle_local_position_pub.get().eph;
 			status.pos_vert_accuracy = _vehicle_local_position_pub.get().epv;
 			_ekf.get_ekf_soln_status(&status.solution_status_flags);
-			_ekf.getImuVibrationMetrics().copyTo(status.vibe);
+
 			status.time_slip = _last_time_slip_us * 1e-6f;
 			status.health_flags = 0.0f; // unused
 			status.timeout_flags = 0.0f; // unused
@@ -1612,8 +1620,8 @@ void Ekf2::Run()
 					bool all_estimates_invalid = false;
 
 					for (uint8_t axis_index = 0; axis_index <= 2; axis_index++) {
-						if (status.covariances[axis_index + 19] < min_var_allowed
-						    || status.covariances[axis_index + 19] > max_var_allowed) {
+						if (states.covariances[axis_index + 19] < min_var_allowed
+						    || states.covariances[axis_index + 19] > max_var_allowed) {
 							all_estimates_invalid = true;
 						}
 					}
@@ -1621,9 +1629,9 @@ void Ekf2::Run()
 					// Store valid estimates and their associated variances
 					if (!all_estimates_invalid) {
 						for (uint8_t axis_index = 0; axis_index <= 2; axis_index++) {
-							_last_valid_mag_cal[axis_index] = status.states[axis_index + 19];
+							_last_valid_mag_cal[axis_index] = states.states[axis_index + 19];
 							_valid_cal_available[axis_index] = true;
-							_last_valid_variance[axis_index] = status.covariances[axis_index + 19];
+							_last_valid_variance[axis_index] = states.covariances[axis_index + 19];
 						}
 					}
 				}
