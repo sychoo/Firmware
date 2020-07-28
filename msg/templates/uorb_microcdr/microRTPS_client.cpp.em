@@ -81,9 +81,6 @@ void* send(void *data);
 uint8_t last_remote_msg_seq = 0;
 uint8_t last_msg_seq = 0;
 
-pthread_mutex_t rcv_lock;
-pthread_mutex_t snd_lock;
-
 @[if send_topics]@
 void* send(void* /*unused*/)
 {
@@ -124,14 +121,12 @@ void* send(void* /*unused*/)
                 last_msg_seq++;
 @[end if]@
                 // copy raw data into local buffer. Payload is shifted by header length to make room for header
-                pthread_mutex_lock(&snd_lock);
                 serialize_@(send_base_types[idx])(&writer, &@(topic)_data, &data_buffer[header_length], &length);
                 if (0 < (read = transport_node->write(static_cast<char>(@(rtps_message_id(ids, topic))), data_buffer, length)))
                 {
                     total_sent += read;
                     ++sent;
                 }
-                pthread_mutex_unlock(&snd_lock);
 @[if topic == 'Timesync' or topic == 'timesync']@
             }
 @[end if]@
@@ -168,10 +163,6 @@ static int launch_send_thread(pthread_t &sender_thread)
 
 void micrortps_start_topics(struct timespec &begin, uint64_t &total_read, uint64_t &received, int &loop)
 {
-    // Initialize mutexes
-    pthread_mutex_init(&rcv_lock, NULL);
-    pthread_mutex_init(&snd_lock, NULL);
-
 @[if recv_topics]@
     char data_buffer[BUFFER_SIZE] = {};
     int read = 0;
@@ -199,7 +190,6 @@ void micrortps_start_topics(struct timespec &begin, uint64_t &total_read, uint64
     while (!_should_exit_task)
     {
 @[if recv_topics]@
-        pthread_mutex_lock(&rcv_lock);
         while (0 < (read = transport_node->read(&topic_ID, data_buffer, BUFFER_SIZE)))
         {
             total_read += read;
@@ -219,7 +209,6 @@ void micrortps_start_topics(struct timespec &begin, uint64_t &total_read, uint64
                 break;
             }
         }
-        pthread_mutex_unlock(&rcv_lock);
 @[end if]@
 
         // loop forever if informed loop number is negative

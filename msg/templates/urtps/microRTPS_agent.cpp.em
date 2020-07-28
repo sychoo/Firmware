@@ -270,7 +270,6 @@ int main(int argc, char** argv)
     bool receiving = false;
     uint8_t topic_ID = 255;
     std::chrono::time_point<std::chrono::steady_clock> start, end;
-    std::mutex rcv_mutex;
 @[end if]@
 
     topics.set_timesync(timeSync);
@@ -290,7 +289,6 @@ int main(int argc, char** argv)
         ++loop;
         if (!receiving) start = std::chrono::steady_clock::now();
         // Publish messages received from UART
-        std::unique_lock<std::mutex> lk(rcv_mutex);
         while (0 < (length = transport_node->read(&topic_ID, data_buffer, BUFFER_SIZE)))
         {
             topics.publish(topic_ID, data_buffer, sizeof(data_buffer));
@@ -299,7 +297,6 @@ int main(int argc, char** argv)
             receiving = true;
             end = std::chrono::steady_clock::now();
         }
-        lk.unlock();
 
         if ((receiving && std::chrono::duration<double>(std::chrono::steady_clock::now() - end).count() > WAIT_CNST) ||
             (!running  && loop > 1))
