@@ -60,9 +60,9 @@ public:
 	ECL_PitchController() = default;
 	~ECL_PitchController() = default;
 
-	float control_attitude(const struct ECL_ControlData &ctl_data) override;
-	float control_euler_rate(const struct ECL_ControlData &ctl_data) override;
-	float control_bodyrate(const struct ECL_ControlData &ctl_data) override;
+	float control_attitude(const float dt, const ECL_ControlData &ctl_data) override;
+	float control_euler_rate(const float dt, const ECL_ControlData &ctl_data) override;
+	float control_bodyrate(const float dt, const ECL_ControlData &ctl_data) override;
 
 	/* Additional Setters */
 	void set_max_rate_pos(float max_rate_pos)
@@ -80,14 +80,8 @@ public:
 		_bodyrate_setpoint = math::constrain(rate, -_max_rate_neg, _max_rate);
 	}
 
-	void set_roll_ff(float roll_ff)
-	{
-		_roll_ff = roll_ff;
-	}
-
 protected:
 	float _max_rate_neg{0.0f};
-	float _roll_ff{0.0f};
 };
 
 #endif // ECL_PITCH_CONTROLLER_H
